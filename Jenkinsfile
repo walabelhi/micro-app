@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -48,7 +47,7 @@ pipeline {
                         echo "Running backend service: ${service}"
                         sh "docker rm -f ${service}-container || true"
 
-                        // NEW PORTS: start from 3002 to avoid conflicts
+                        // Backend ports: 3002-3006
                         def port = 3002 + services.indexOf(service)
 
                         sh """
@@ -72,7 +71,7 @@ pipeline {
                 docker run -d \
                 --network micro-network \
                 --restart unless-stopped \
-                -p 8080:80 \
+                -p 8081:80 \
                 --name ${env.FRONTEND_SERVICE}-container \
                 ${env.FRONTEND_SERVICE}-image
                 """
