@@ -1,14 +1,15 @@
-FROM node:20-alpine
-
+# Dockerfile for frontend
+FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
 RUN npm install
 
-COPY tsconfig.json ./
-COPY src ./src
-
+COPY . .
 RUN npm run build
 
-EXPOSE 3000
-CMD ["node", "dist/index.js"]
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
