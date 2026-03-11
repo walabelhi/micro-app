@@ -7,8 +7,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main', 
-                    url: 'https://github.com/walabelhi/micro-app.git', 
-                    credentialsId: 'GitHub PAT'
+                    url: 'https://github.com/walabelhi/micro-app.git'
             }
         }
 
