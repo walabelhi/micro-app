@@ -3,7 +3,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY = 'your-dockerhub-username' // replace with your Docker Hub username
+        DOCKER_REGISTRY = 'wala12' // Your Docker Hub username
         COMMIT_HASH = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
     }
 
@@ -23,7 +23,7 @@ pipeline {
                         def imageName = "${DOCKER_REGISTRY}/${service}:${COMMIT_HASH}"
                         echo "Building Docker image for ${service}: ${imageName}"
 
-                        // Build the Docker image
+                        // Build Docker image
                         sh "docker build -t ${imageName} ./${service}"
                     }
                 }
@@ -33,13 +33,16 @@ pipeline {
         stage('Push Docker Images') {
             steps {
                 script {
+                    // Log in to Docker Hub using Jenkins credentials
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    }
+
                     def services = ['auth', 'orders', 'payments', 'tickets', 'expiration', 'client']
 
                     services.each { service ->
                         def imageName = "${DOCKER_REGISTRY}/${service}:${COMMIT_HASH}"
                         echo "Pushing Docker image: ${imageName}"
-
-                        // Push the Docker image
                         sh "docker push ${imageName}"
                     }
                 }
