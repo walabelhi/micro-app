@@ -18,6 +18,7 @@ pipeline {
                     def services = ['auth', 'orders', 'payments', 'tickets', 'expiration', 'client']
                     services.each { service ->
                         def imageName = "${DOCKER_REGISTRY}/${service}:${COMMIT_HASH}"
+                        echo "Building Docker image for ${service}: ${imageName}"
                         sh "docker build -t ${imageName} ./${service}"
                     }
                 }
@@ -33,6 +34,7 @@ pipeline {
                     def services = ['auth', 'orders', 'payments', 'tickets', 'expiration', 'client']
                     services.each { service ->
                         def imageName = "${DOCKER_REGISTRY}/${service}:${COMMIT_HASH}"
+                        echo "Pushing Docker image: ${imageName}"
                         sh "docker push ${imageName}"
                     }
                 }
