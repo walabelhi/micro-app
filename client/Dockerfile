@@ -1,20 +1,22 @@
-# auth/Dockerfile
-FROM node:20-alpine
+# Build stage
+FROM node:20-alpine as build
 
 WORKDIR /app
 
-# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy TypeScript config and source code explicitly
-COPY tsconfig.json ./
-COPY src ./src
-
-# Build TypeScript
+COPY . .
 RUN npm run build
 
-EXPOSE 3000
+# Production stage
+FROM nginx:alpine
 
-# Run the compiled JS
-CMD ["node", "dist/index.js"]
+# Copy build output to Nginx public folder
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
