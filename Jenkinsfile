@@ -9,7 +9,27 @@ pipeline {
 
     stages {
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                // Full checkout to ensure all files are present
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    extensions: [[$class: 'CloneOption', shallow: false, depth: 0, noTags: false, timeout: 10]],
+                    userRemoteConfigs: [[url: 'https://github.com/walabelhi/micro-app.git', credentialsId: 'github-token']]
+                ])
+            }
+        }
+
+        stage('Debug Workspace') {
+            steps {
+                echo "Listing root project files:"
+                sh 'ls -l'
+                echo "Listing service directories:"
+                sh 'ls -l auth orders payments tickets expiration client'
+                echo "Listing auth/src files:"
+                sh 'ls -l auth/src'
+                sh 'ls -l auth/tsconfig.json'
+            }
         }
 
         stage('Build Docker Images') {
@@ -43,7 +63,10 @@ pipeline {
     }
 
     post {
-        always { sh "docker system prune -f" }
+        always { 
+            echo "Cleaning up Docker cache..."
+            sh "docker system prune -f" 
+        }
         success { echo 'Docker images built and pushed successfully!' }
         failure { echo 'Pipeline failed.' }
     }
