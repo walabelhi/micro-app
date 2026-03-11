@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -5,7 +6,9 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git 'https://github.com/walabelhi/micro-app.git'
+                git branch: 'main', 
+                    url: 'https://github.com/walabelhi/micro-app.git', 
+                    credentialsId: 'GitHub PAT'
             }
         }
 
