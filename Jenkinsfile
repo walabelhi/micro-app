@@ -27,8 +27,8 @@ pipeline {
                 echo "Listing service directories:"
                 sh 'ls -l auth orders payments tickets expiration client'
                 echo "Listing auth/src files:"
-                sh 'ls -l auth/src'
-                sh 'ls -l auth/tsconfig.json'
+                sh 'ls -l auth/src || echo "auth/src missing"'
+                sh 'ls -l auth/tsconfig.json || echo "auth/tsconfig.json missing"'
             }
         }
 
@@ -37,9 +37,16 @@ pipeline {
                 script {
                     def services = ['auth', 'orders', 'payments', 'tickets', 'expiration', 'client']
                     services.each { service ->
-                        def imageName = "${DOCKER_REGISTRY}/${service}:${COMMIT_HASH}"
-                        echo "Building Docker image for ${service}: ${imageName}"
-                        sh "docker build -t ${imageName} ./${service}"
+                        def dockerfile = "./${service}/Dockerfile"
+                        def srcFolder = "./${service}/src"
+
+                        if (fileExists(dockerfile) && fileExists(srcFolder)) {
+                            def imageName = "${DOCKER_REGISTRY}/${service}:${COMMIT_HASH}"
+                            echo "Building Docker image for ${service}: ${imageName}"
+                            sh "docker build -t ${imageName} ./${service}"
+                        } else {
+                            echo "Skipping ${service}: Dockerfile or src folder missing"
+                        }
                     }
                 }
             }
@@ -51,11 +58,19 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                     }
+
                     def services = ['auth', 'orders', 'payments', 'tickets', 'expiration', 'client']
                     services.each { service ->
-                        def imageName = "${DOCKER_REGISTRY}/${service}:${COMMIT_HASH}"
-                        echo "Pushing Docker image: ${imageName}"
-                        sh "docker push ${imageName}"
+                        def dockerfile = "./${service}/Dockerfile"
+                        def srcFolder = "./${service}/src"
+
+                        if (fileExists(dockerfile) && fileExists(srcFolder)) {
+                            def imageName = "${DOCKER_REGISTRY}/${service}:${COMMIT_HASH}"
+                            echo "Pushing Docker image: ${imageName}"
+                            sh "docker push ${imageName}"
+                        } else {
+                            echo "Skipping push for ${service}: Dockerfile or src folder missing"
+                        }
                     }
                 }
             }
