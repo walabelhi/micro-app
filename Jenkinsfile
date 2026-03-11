@@ -15,6 +15,12 @@ pipeline {
             }
         }
 
+        stage('Create Docker Network') {
+            steps {
+                sh "docker network create micro-network || true"
+            }
+        }
+
         stage('Build Backend Docker Images') {
             steps {
                 script {
@@ -49,6 +55,8 @@ pipeline {
 
                         sh """
                         docker run -d \
+                        --network micro-network \
+                        --restart unless-stopped \
                         -p ${port}:3000 \
                         --name ${service}-container \
                         ${service}-image
@@ -66,6 +74,8 @@ pipeline {
 
                 sh """
                 docker run -d \
+                --network micro-network \
+                --restart unless-stopped \
                 -p 8080:80 \
                 --name ${env.FRONTEND_SERVICE}-container \
                 ${env.FRONTEND_SERVICE}-image
@@ -73,7 +83,7 @@ pipeline {
             }
         }
 
-        stage('Verify') {
+        stage('Verify Running Containers') {
             steps {
                 sh "docker ps"
             }
