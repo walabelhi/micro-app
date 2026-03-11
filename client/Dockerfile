@@ -1,15 +1,20 @@
-# React client Dockerfile
-# Build stage
-FROM node:20-alpine as build
+# auth/Dockerfile
+FROM node:20-alpine
 
 WORKDIR /app
+
+# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm install
-COPY . .
+
+# Copy TypeScript config and source code explicitly
+COPY tsconfig.json ./
+COPY src ./src
+
+# Build TypeScript
 RUN npm run build
 
-# Serve stage
-FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 3000
+
+# Run the compiled JS
+CMD ["node", "dist/index.js"]
