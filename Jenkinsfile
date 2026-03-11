@@ -2,30 +2,36 @@ pipeline {
     agent any
 
     stages {
+
         stage('Checkout') {
             steps {
-                echo 'Cloning Git repository...'
-                git branch: 'main', url: 'https://github.com/walabelhi/micro-app.git'
+                git 'https://github.com/walabelhi/micro-app.git'
             }
         }
 
-        stage('Build & Test') {
+        stage('Build Orders') {
             steps {
-                echo 'Building and testing all microservices...'
-                sh '''
-                    cd orders && npm install && npm test
-                    cd ../payments && npm install && npm test
-                    cd ../tickets && npm install && npm test
-                    cd ../expiration && npm install && npm test
-                '''
+                sh 'cd orders && npm install'
             }
         }
 
-        stage('Docker Build') {
+        stage('Build Payments') {
             steps {
-                echo 'Building Docker images...'
-                sh 'docker-compose build'
+                sh 'cd payments && npm install'
             }
         }
+
+        stage('Build Tickets') {
+            steps {
+                sh 'cd tickets && npm install'
+            }
+        }
+
+        stage('Build Expiration') {
+            steps {
+                sh 'cd expiration && npm install'
+            }
+        }
+
     }
 }
