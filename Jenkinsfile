@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY = "yourdockerhubusername"
+        DOCKER_REGISTRY = "wala12" // your Docker Hub username
         IMAGE_AUTH = "${DOCKER_REGISTRY}/auth-image:latest"
         IMAGE_CLIENT = "${DOCKER_REGISTRY}/client-image:latest"
         JWT_KEY = "43ba2895a746d98f86a62d45f3fbfdd6"
@@ -18,7 +18,10 @@ pipeline {
         stage('Build Images') {
             steps {
                 script {
-                    docker.build("auth-image", "./auth")
+                    // Build auth image with JWT_KEY as build arg
+                    docker.build("auth-image", "--build-arg JWT_KEY=${JWT_KEY} ./auth")
+
+                    // Build client image normally
                     docker.build("client-image", "./client")
                 }
             }
