@@ -2,40 +2,62 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY = "wala12" // your Docker Hub username
-        IMAGE_AUTH = "${DOCKER_REGISTRY}/auth-image:latest"
-        IMAGE_CLIENT = "${DOCKER_REGISTRY}/client-image:latest"
-        JWT_KEY = "43ba2895a746d98f86a62d45f3fbfdd6"
+        REGISTRY = "wala12"                       // Your Docker Hub username
+        REGISTRY_CREDENTIAL = "dockerhub-credentials" // Jenkins credentials ID
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/gharbijihen/micro-app.git', branch: 'master'
+                checkout scm
             }
         }
 
-        stage('Build Images') {
+        stage('Build and Push Docker Images') {
             steps {
                 script {
-                    // Build auth image with JWT_KEY as build arg
-                    docker.build("auth-image", "--build-arg JWT_KEY=${JWT_KEY} ./auth")
+                    // List of your microservices
+                    def services = ['auth', 'payment', 'client', 'expiration', 'orders', 'tickets']
 
-                    // Build client image normally
-                    docker.build("client-image", "./client")
-                }
-            }
-        }
-
-        stage('Push Images') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        docker.image("auth-image").push('latest')
-                        docker.image("client-image").push('latest')
+                    // Login to Docker Hub once
+                    withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIAL,
+                                                     usernameVariable: 'DOCKER_USER',
+                                                     passwordVariable: 'DOCKER_PASS')]) {
+                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
                     }
+
+                    // Build and push images in parallel
+                    def buildPushStages = [:]
+
+                    for (service in services) {
+                        buildPushStages[service] = {
+                            def imageTag = "${REGISTRY}/${service}:${env.GIT_COMMIT.take(7)}" // short SHA
+                            echo "Building ${service} image: ${imageTag}"
+
+                            // Build Docker image
+                            sh "docker build -t ${imageTag} ./${service}"
+
+                            // Push Docker image
+                            sh "docker push ${imageTag}"
+                        }
+                    }
+
+                    parallel buildPushStages
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning up Docker login...'
+            sh 'docker logout'
+        }
+        success {
+            echo 'All microservices images built and pushed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check the logs.'
         }
     }
 }
