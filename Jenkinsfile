@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY = "wala12"                       // Your Docker Hub username
-        REGISTRY_CREDENTIAL = "dockerhub-credentials" // Jenkins credentials ID
+        REGISTRY = "wala12"                  // Your Docker Hub username
+        REGISTRY_CREDENTIAL = "dockerhub-credentials"  // Jenkins credential ID containing PAT
     }
 
     stages {
@@ -19,29 +19,39 @@ pipeline {
                     // List of your microservices
                     def services = ['auth', 'payment', 'client', 'expiration', 'orders', 'tickets']
 
-                    // Login to Docker Hub once
+                    // Docker login using PAT from Jenkins credentials
                     withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIAL,
                                                      usernameVariable: 'DOCKER_USER',
                                                      passwordVariable: 'DOCKER_PASS')]) {
-                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
                     }
 
-                    // Build and push images in parallel
+                    // Build and push each service in parallel
                     def buildPushStages = [:]
 
                     for (service in services) {
                         buildPushStages[service] = {
-                            def imageTag = "${REGISTRY}/${service}:${env.GIT_COMMIT.take(7)}" // short SHA
-                            echo "Building ${service} image: ${imageTag}"
+                            def shaTag = "${env.GIT_COMMIT.take(7)}"
+                            def imageSha = "${REGISTRY}/${service}:${shaTag}"
+                            def imageLatest = "${REGISTRY}/${service}:latest"
 
-                            // Build Docker image
-                            sh "docker build -t ${imageTag} ./${service}"
+                            echo "Building ${service} image with tags: ${shaTag} and latest"
 
-                            // Push Docker image
-                            sh "docker push ${imageTag}"
+                            // Build image
+                            sh "docker build -t ${imageSha} ./${service}"
+
+                            // Tag as latest
+                            sh "docker tag ${imageSha} ${imageLatest}"
+
+                            // Push both tags
+                            retry(2) {  // retry in case of transient errors
+                                sh "docker push ${imageSha}"
+                                sh "docker push ${imageLatest}"
+                            }
                         }
                     }
 
+                    // Execute all builds in parallel
                     parallel buildPushStages
                 }
             }
@@ -50,14 +60,15 @@ pipeline {
 
     post {
         always {
-            echo 'Cleaning up Docker login...'
-            sh 'docker logout'
+            // Logout from Docker Hub
+            sh "docker logout"
+            echo "Docker logout complete."
         }
         success {
-            echo 'All microservices images built and pushed successfully!'
+            echo "All microservices built and pushed successfully!"
         }
         failure {
-            echo 'Pipeline failed. Check the logs.'
+            echo "Pipeline failed. Check the logs for details."
         }
     }
 }
