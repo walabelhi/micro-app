@@ -1,4 +1,5 @@
-auth/node_modules
+.env
+*/.envauth/node_modules
 auth/rest-client.http
 expiration/node_modules
 orders/node_modules
