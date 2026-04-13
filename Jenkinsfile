@@ -6,13 +6,12 @@ pipeline {
         GIT_REPO_URL = 'https://github.com/walabelhi/micro-app' // replace if using multibranch or to be overridden
 
         // Credentials (replace with your actual Jenkins IDs)
-        DOCKERHUB_CREDENTIALS_ID = 'dckr_pat_kX6BbPt5MTLKwjNCMF14JcC63pc' // Username/Password or Docker Hub token stored in Jenkins
-        // If you use a separate registry for image pulling/pushing:
-        // DOCKERHUB_REGISTRY = 'docker.io' // optional
+        DOCKERHUB_CREDENTIALS_ID = "dockerhub-credentials"
+
 
         // SonarQube
         SONARQUBE_SERVER = 'http://localhost:9000' // Jenkins SonarQube server ID configured in Jenkins
-        SONAR_TOKEN_CREDENTIALS_ID = 'sqp_sqp_39eb71bdb4af554f81efaf8fa343d8fccd61d38f' // Secret text or credentials containing sonar token
+        SONAR_TOKEN_CREDENTIALS_ID = "sonar-token" // Secret text or credentials containing sonar token
 
         // Trivy image (use a compatible image with your environment)
         TRIVY_IMAGE = 'aquasec/trivy:latest'
@@ -21,7 +20,7 @@ pipeline {
         SERVICES = "auth client orders payments tickets expiration"
 
         // Branch to track (adjust if using feature branches)
-        GIT_BRANCH = '*/main'
+        GIT_BRANCH = '*/master'
     }
 
     options {
