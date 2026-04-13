@@ -4,6 +4,8 @@ pipeline {
     environment {
         REGISTRY = "wala12"
         REGISTRY_CREDENTIAL = "dockerhub-credentials"
+        SONAR_TOKEN = credentials('d953b3af1d5419e0e9c577d0f5845870d34eefca')
+        SONAR_URL = "http://localhost:9000"
     }
 
     stages {
@@ -14,37 +16,59 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('Docker Login') {
             steps {
-                echo "Running SonarQube analysis..."
-                // Placeholder (we connect real Sonar later)
-                sh 'echo "SonarQube scan simulated"'
+                withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIAL,
+                    usernameVariable: 'wala12',
+                    passwordVariable: '123456789')]) {
+
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                }
             }
         }
 
-        stage('Build and Push Docker Images') {
+        stage('SonarQube Analysis') {
             steps {
                 script {
-                    // ✅ FIXED services list
-                    def services = ['auth', 'payments', 'client', 'expiration', 'orders', 'tickets']
+                    sh """
+                    docker run --rm \
+                      -e SONAR_HOST_URL=${http://localhost:9000} \
+                      -e SONAR_LOGIN=${d953b3af1d5419e0e9c577d0f5845870d34eefca} \
+                      -v $(pwd):/usr/src \
+                      sonarsource/sonar-scanner-cli
+                    """
+                }
+            }
+        }
 
-                    withCredentials([usernamePassword(
-                        credentialsId: REGISTRY_CREDENTIAL,
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )]) {
-                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                    }
-
-                    def buildPushStages = [:]
+        stage('Trivy Scan Images') {
+            steps {
+                script {
+                    def services = ['auth','payment','client','expiration','orders','tickets']
 
                     for (service in services) {
-                        buildPushStages[service] = {
-                            def shaTag = "${env.GIT_COMMIT.take(7)}"
-                            def imageSha = "${REGISTRY}/${service}:${shaTag}"
+                        sh """
+                        trivy image ${REGISTRY}/${service}:latest || true
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Build & Push Docker Images') {
+            steps {
+                script {
+                    def services = ['auth','payment','client','expiration','orders','tickets']
+
+                    def buildStages = [:]
+
+                    for (service in services) {
+                        buildStages[service] = {
+                            def sha = env.GIT_COMMIT.take(7)
+                            def imageSha = "${REGISTRY}/${service}:${sha}"
                             def imageLatest = "${REGISTRY}/${service}:latest"
 
-                            echo "Building ${service}..."
+                            echo "Building ${service}"
 
                             sh "docker build -t ${imageSha} ./${service}"
                             sh "docker tag ${imageSha} ${imageLatest}"
@@ -56,21 +80,7 @@ pipeline {
                         }
                     }
 
-                    parallel buildPushStages
-                }
-            }
-        }
-
-        stage('Trivy Scan') {
-            steps {
-                script {
-                    def services = ['auth', 'payments', 'client', 'expiration', 'orders', 'tickets']
-                    def shaTag = "${env.GIT_COMMIT.take(7)}"
-
-                    for (service in services) {
-                        echo "Scanning ${service}..."
-                        sh "trivy image ${REGISTRY}/${service}:${shaTag} || true"
-                    }
+                    parallel buildStages
                 }
             }
         }
@@ -79,13 +89,17 @@ pipeline {
     post {
         always {
             sh "docker logout"
-            echo "Docker logout complete."
         }
+
         success {
-            echo "Pipeline completed successfully!"
+            echo "CI/CD completed successfully (Sonar + Trivy + Docker push)"
         }
+
         failure {
-            echo "Pipeline failed. Check logs."
+            echo "Pipeline failed"
+        }
+    }
+}
         }
     }
 }
