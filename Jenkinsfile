@@ -5,7 +5,9 @@ pipeline {
         REGISTRY = "wala12"
         REGISTRY_CREDENTIAL = "dockerhub-credentials"
         SERVICES = "auth client orders payments tickets expiration"
-        SONAR_TOKEN = "sonar-token"
+
+        SONAR_HOST = "http://localhost:9000"
+        SONAR_SCANNER = "/opt/sonar-scanner/bin/sonar-scanner"
     }
 
     stages {
@@ -33,13 +35,15 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    sh """
-                        sonar-scanner \
+                    sh '''
+                        echo "Running SonarQube scan..."
+
+                        ''' + SONAR_SCANNER + ''' \
                           -Dsonar.projectKey=micro-app \
                           -Dsonar.sources=. \
-                          -Dsonar.host.url=http://localhost:9000 \
+                          -Dsonar.host.url=''' + SONAR_HOST + ''' \
                           -Dsonar.login=$SONAR_TOKEN
-                    """
+                    '''
                 }
             }
         }
