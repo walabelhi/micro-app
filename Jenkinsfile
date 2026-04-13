@@ -30,19 +30,17 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv("${SONAR_SERVER}") {
-                    sh '''
-                        sonar-scanner \
-                          -Dsonar.projectKey=micro-app \
-                          -Dsonar.sources=. \
-                          -Dsonar.host.url=http://localhost:9000 \
-                          -Dsonar.login=$SONAR_AUTH_TOKEN
-                    '''
+                   stage('SonarQube Analysis') {
+                steps {
+                    sh """
+                    sonar-scanner \
+                      -Dsonar.projectKey=micro-app \
+                      -Dsonar.sources=. \
+                      -Dsonar.host.url=http://localhost:9000 \
+                      -Dsonar.login=${SONAR_TOKEN}
+                    """
                 }
             }
-        }
 
         stage('Trivy Scan') {
             steps {
