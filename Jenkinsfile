@@ -27,19 +27,20 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-                    sh """
-                    docker run --rm \
-                      -e SONAR_HOST_URL=${http://localhost:9000} \
-                      -e SONAR_LOGIN=${d953b3af1d5419e0e9c577d0f5845870d34eefca} \
-                      -v $(pwd):/usr/src \
-                      sonarsource/sonar-scanner-cli
-                    """
-                }
-            }
+       stage('SonarQube Analysis') {
+    steps {
+        withSonarQubeEnv('sonar') {
+            sh """
+            sonar-scanner \
+              -Dsonar.projectKey=micro-app \
+              -Dsonar.sources=. \
+              -Dsonar.host.url=http://localhost:9000 \
+              -Dsonar.login=$sqp_39eb71bdb4af554f81efaf8fa343d8fccd61d38f
+            """
         }
+    }
+}
+        
 
         stage('Trivy Scan Images') {
             steps {
