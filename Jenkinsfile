@@ -4,8 +4,8 @@ pipeline {
     environment {
         REGISTRY = "wala12"
         REGISTRY_CREDENTIAL = "dockerhub-credentials"
-        SONAR_SERVER = "sonar"
         SERVICES = "auth client orders payments tickets expiration"
+        SONAR_TOKEN = "sonar-token" 
     }
 
     stages {
