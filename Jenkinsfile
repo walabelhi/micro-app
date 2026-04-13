@@ -5,7 +5,7 @@ pipeline {
         REGISTRY = "wala12"
         REGISTRY_CREDENTIAL = "dockerhub-credentials"
         SERVICES = "auth client orders payments tickets expiration"
-        SONAR_TOKEN = "sonar-token" 
+        SONAR_TOKEN = "sonar-token"
     }
 
     stages {
@@ -30,17 +30,19 @@ pipeline {
             }
         }
 
-                   stage('SonarQube Analysis') {
-                steps {
+        stage('SonarQube Analysis') {
+            steps {
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                     sh """
-                    sonar-scanner \
-                      -Dsonar.projectKey=micro-app \
-                      -Dsonar.sources=. \
-                      -Dsonar.host.url=http://localhost:9000 \
-                      -Dsonar.login=$SONAR_TOKEN
+                        sonar-scanner \
+                          -Dsonar.projectKey=micro-app \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=http://localhost:9000 \
+                          -Dsonar.login=$SONAR_TOKEN
                     """
                 }
             }
+        }
 
         stage('Trivy Scan') {
             steps {
