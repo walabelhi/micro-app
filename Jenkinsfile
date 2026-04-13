@@ -2,122 +2,190 @@ pipeline {
     agent any
 
     environment {
-        BACKEND_SERVICES = 'auth,orders,payments,tickets,expiration'
-        FRONTEND_SERVICE = 'client'
+        // Git repo to clone (optional if Jenkins Multibranch handles it)
+        GIT_REPO_URL = 'https://github.com/walabelhi/micro-app' // replace if using multibranch or to be overridden
+
+        // Credentials (replace with your actual Jenkins IDs)
+        DOCKERHUB_CREDENTIALS_ID = "dockerhub-credentials"
+
+
+        // SonarQube
+        SONARQUBE_SERVER = 'http://localhost:9000' // Jenkins SonarQube server ID configured in Jenkins
+        SONAR_TOKEN_CREDENTIALS_ID = "sonar-token" // Secret text or credentials containing sonar token
+
+        // Trivy image (use a compatible image with your environment)
+        TRIVY_IMAGE = 'aquasec/trivy:latest'
+
+        // Services list (space-separated directory names under repo root)
+        SERVICES = "auth client orders payments tickets expiration"
+
+        // Branch to track (adjust if using feature branches)
+        GIT_BRANCH = '*/master'
+    }
+
+    options {
+        timestamps()
+        // Concurrency control if desired
+        // disableConcurrentBuilds()
+        // Keep build logs readable
+        skipDefaultCheckout false
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/walabelhi/micro-app.git'
+                // If using Multibranch Pipeline, you may omit manual checkout
+                checkout scm: [
+                    $class: 'GitSCM',
+                    branches: [[ name: "${GIT_BRANCH}" ]],
+                    userRemoteConfigs: [[ url: "${GIT_REPO_URL}" ]]
+                ]
             }
         }
 
-        stage('Build Backend Docker Images') {
+        stage('Docker Login') {
             steps {
                 script {
-                    def services = env.BACKEND_SERVICES.split(',')
-                    for (service in services) {
-                        echo "Building backend service: ${service}"
-                        sh "docker build -t ${service}-image ./${service}"
-                    }
-                }
-            }
-        }
-
-        stage('Build Frontend Docker Image') {
-            steps {
-                echo "Building frontend service: ${env.FRONTEND_SERVICE}"
-                sh "docker build -t ${env.FRONTEND_SERVICE}-image ./${env.FRONTEND_SERVICE}"
-            }
-        }
-
-        stage('Run Backend Containers') {
-            steps {
-                script {
-                    def services = env.BACKEND_SERVICES.split(',')
-                    for (service in services) {
-                        echo "Running backend service: ${service}"
-
-                        // remove old container
-                        sh "docker rm -f ${service}-container || true"
-
-                        // assign different port لكل service
-                        def port = 3000 + services.indexOf(service)
-
-                        sh "docker run -d -p ${port}:3000 --name ${service}-container ${service}-image"
-                    }
-                }
-            }
-        }
-
-        stage('Run Frontend Container') {
-            steps {
-                echo "Running frontend service: ${env.FRONTEND_SERVICE}"
-
-                sh "docker rm -f ${env.FRONTEND_SERVICE}-container || true"
-                sh "docker run -d -p 8080:80 --name ${env.FRONTEND_SERVICE}-container ${env.FRONTEND_SERVICE}-image"
-            }
-        }
-
-        stage('Scan Docker Images with Trivy') {
-            steps {
-                script {
-                    def services = env.BACKEND_SERVICES.split(',')
-                    services.add(env.FRONTEND_SERVICE)
-
-                    for (service in services) {
-                        echo "Scanning ${service}-image with Trivy"
-
+                    withCredentials([usernamePassword(credentialsId: DOCKERHUB_CREDENTIALS_ID,
+                                                     usernameVariable: 'Wala12',
+                                                     passwordVariable: 'wala2026!')]) {
                         sh """
-                        trivy image \
-                          --format template \
-                          --template '@contrib/html.tpl' \
-                          -o trivy-${service}.html \
-                          ${service}-image || true
+                          echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
                         """
                     }
                 }
             }
         }
 
-        stage('Publish Trivy Reports') {
+        stage('SonarQube Analysis') {
             steps {
                 script {
-                    def services = env.BACKEND_SERVICES.split(',')
-                    services.add(env.FRONTEND_SERVICE)
-
-                    for (service in services) {
-                        publishHTML([
-                            allowMissing: true,
-                            alwaysLinkToLastBuild: true,
-                            keepAll: true,
-                            reportDir: '.',
-                            reportFiles: "trivy-${service}.html",
-                            reportName: "Trivy Report - ${service}"
-                        ])
+                    // Run SonarQube analysis per service
+                    def services = "${SERVICES}".split()
+                    withSonarQubeEnv(SONARQUBE_SERVER) {
+                        for (svc in services) {
+                            def sonarProjectKey = "${svc}"
+                            def sonarProjectDir = "${svc}"
+                            // If you have per-service sonar-project.properties, use it; otherwise, pass defaults
+                            sh """
+                               if [ -f "${sonarProjectDir}/sonar-project.properties" ]; then
+                                   sonar-scanner -Dsonar.projectKey=${sonarProjectKey} -Dsonar.sources=${sonarProjectDir}
+                               else
+                                   sonar-scanner -Dsonar.projectKey=${sonarProjectKey} -Dsonar.sources=${sonarProjectDir} \
+                                                 -Dsonar.host.url=\$(grep -m1 -oP 'server:\s*.*' -n ${SONARQUBE_SERVER} || true) || true
+                               fi
+                            """
+                        }
                     }
                 }
             }
         }
 
-        stage('Verify Running Containers') {
+        stage('Trivy Scan') {
             steps {
-                sh "docker ps"
+                script {
+                    def services = "${SERVICES}".split()
+                    // Run Trivy scan for each service directory (scans filesystem)
+                    for (svc in services) {
+                        if (fileExists("${svc}/Dockerfile")) {
+                            sh """
+                               docker build -q -t ${svc}-temp-build ${svc} >/dev/null 2>&1 || true
+                               docker rm -f ${svc}-trivy || true
+                               docker run --name ${svc}-trivy --rm -v \$(pwd):/project -w /project ${TRIVY_IMAGE} \
+                                   fs ${svc} --ignore-unfixed || true
+                            """
+                        } else {
+                            echo "No Dockerfile found for ${svc}, skipping Trivy scan for this service."
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build & Push') {
+            steps {
+                script {
+                    def services = "${SERVICES}".split()
+                    def gitCommit = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+
+                    // Build & push in parallel per service
+                    def builds = [:]
+                    for (svc in services) {
+                        builds[svc] = {
+                            stage("Build & Push ${svc}") {
+                                withEnv(["IMAGE_TAG=${svc}:latest", "COMMIT_TAG=${svc}:${gitCommit}"]) {
+                                    sh """
+                                       set -e
+                                       if [ ! -f ${svc}/Dockerfile ]; then
+                                           echo "No Dockerfile for ${svc}, skipping..."
+                                           exit 0
+                                       fi
+
+                                       # Build
+                                       docker build -t ${svc}:latest ${svc}
+                                       # Tag for Docker Hub
+                                       docker tag ${svc}:latest ${DOCKERHUB_USERNAME}/${svc}:latest
+                                       docker tag ${svc}:latest ${DOCKERHUB_USERNAME}/${svc}:${gitCommit}
+
+                                       # Push
+                                       docker push ${DOCKERHUB_USERNAME}/${svc}:latest
+                                       docker push ${DOCKERHUB_USERNAME}/${svc}:${gitCommit}
+                                    """
+                                }
+                            }
+                        }
+                    }
+
+                    // Resolve DOCKERHUB_USERNAME from credentials now
+                    withCredentials([usernamePassword(credentialsId: DOCKERHUB_CREDENTIALS_ID,
+                                                     usernameVariable: 'DOCKERHUB_USERNAME',
+                                                     passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                        // login was done earlier; ensure env has username for tagging
+                        parallel builds
+                    }
+                }
+            }
+        }
+
+        stage('Post Actions') {
+            steps {
+                sh 'docker logout'
+                // Optional: cleanup local images
+                script {
+                    sh 'docker image prune -f || true'
+                }
+            }
+        }
+
+        stage('CD Prep (Kubernetes)') {
+            when {
+                expression { true } // placeholder; enable when CD is implemented
+            }
+            steps {
+                echo 'CD stage is prepared (Kubernetes deployment not implemented in this version).'
+                // Example stub: you could generate manifests or push to a release repo here
             }
         }
     }
 
     post {
         always {
-            echo 'Pipeline finished!'
+            script {
+                echo "Build finished with status: ${currentBuild.currentResult}"
+                // Optional: archive logs/artifacts if needed
+            }
         }
         success {
-            echo 'All services built, running, and scanned successfully!'
+            echo 'Pipeline succeeded.'
         }
         failure {
-            echo 'Pipeline failed!'
+            echo 'Pipeline failed.'
+        }
+        unstable {
+            echo 'Pipeline unstable.'
+        }
+        changed {
+            echo 'Pipeline status changed.'
         }
     }
 }
