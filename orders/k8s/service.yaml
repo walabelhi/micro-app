@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: auth-service
+  name: orders-service
 spec:
   selector:
-    app: auth
+    app: orders-service
   ports:
     - port: 80
-      targetPort: 3000
+      targetPort: 80
   type: ClusterIP

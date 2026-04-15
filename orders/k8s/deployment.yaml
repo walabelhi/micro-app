@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth
+  name: orders-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: auth
+      app: orders-service
   template:
     metadata:
       labels:
-        app: auth
+        app: orders-service
     spec:
       containers:
-        - name: auth
-          image: wala12/auth:latest
+        - name: orders-service
+          image: nginx:latest
           ports:
-            - containerPort: 3000
+            - containerPort: 80
