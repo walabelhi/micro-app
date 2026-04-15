@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tickets-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tickets-service
+  template:
+    metadata:
+      labels:
+        app: tickets-service
+    spec:
+      containers:
+        - name: tickets-service
+          image: nginx:latest
+          ports:
+            - containerPort: 80
