@@ -1,9 +1,12 @@
-# Dockerfile for frontend
-FROM node:20-alpine AS build
+FROM node:18-alpine
+
 WORKDIR /app
+
 COPY package*.json ./
 RUN npm install
+
 COPY . .
 
-EXPOSE 3000
-CMD ["nginx", "-g", "daemon off;"]
+RUN npm run build
+
+CMD ["node", "dist/index.js"]
