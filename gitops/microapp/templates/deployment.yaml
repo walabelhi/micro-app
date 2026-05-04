@@ -1,0 +1,9 @@
+env:
+          {{- range $key, $value := $svc.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+          {{- end }}
+---
+{{- end }}
+
+
