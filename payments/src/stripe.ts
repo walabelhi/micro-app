@@ -6,6 +6,4 @@ if (!key) {
   throw new Error("STRIPE_SECRET_KEY is missing");
 }
 
-export const stripe = new Stripe(key, {
-  apiVersion: "2024-06-20",
-});
+export const stripe = new Stripe(key);
