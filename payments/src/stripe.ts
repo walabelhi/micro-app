@@ -1,7 +1,11 @@
 import Stripe from "stripe";
 
-export const stripe = new Stripe(process.env.STRIPE_KEY!, {
-  // apiVersion: "2024-09-30.acacia",
-  //apiVersion: "2025-01-27.acacia",
-  //apiVersion: "2025-02-24.acacia",
+const key = process.env.STRIPE_SECRET_KEY;
+
+if (!key) {
+  throw new Error("STRIPE_SECRET_KEY is missing");
+}
+
+export const stripe = new Stripe(key, {
+  apiVersion: "2024-06-20",
 });
